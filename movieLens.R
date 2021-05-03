@@ -2,7 +2,13 @@ library(tidyverse)
 library(caret)
 library(data.table)
 
+# installing tinytex to knit pdf from rmd files
+install.packages('tinytex')
+tinytex::install_tinytex()
+
+################################################################################
 # Create edx set, validation set (final hold-out test set)
+
 dl <- tempfile()
 download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
@@ -34,6 +40,7 @@ removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
 ################################################################################
 #Q1
 dim(edx)
@@ -63,5 +70,40 @@ edx %>% group_by(movieId, title) %>%
 edx %>% group_by(rating) %>%
   summarize(n=n()) %>% 
   arrange(desc(n))
+################################################################################
+#what kinds of data?
+str(edx)
+summary(edx)
+
+#unique users and movies
+edx %>% summarize(n_users =n_distinct(userId), n_movies= n_distinct(movieId))
+
+#plot
+
+#movies
+edx %>% 
+  dplyr::count(movieId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() + 
+  ggtitle("Movies")
+
+#users
+edx %>%
+  dplyr::count(userId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() +
+  ggtitle("Users")
+
+#ratings
+edx %>%
+  ggplot(aes(rating)) + 
+  geom_bar() + 
+  ggtitle("ratings")
+
+mean(edx$rating)
+
+
 
   

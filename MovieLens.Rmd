@@ -2,19 +2,136 @@
 title: "MovieLens Report"
 author: "Masayoshi Sato"
 date: "2021/5/3"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
-Introduction
 
-Dataset
+## Introduction
 
-Data loading 
+For this project, I will be creating a movie recommendation system using the MovieLens dataset.
 
-explatory analysis
+## Dataset
 
-model building and RMSE calculation
+The data used in this report is available at the Grouplens website. The data size was reduced from the original MovieLens data. It has 1 million movie ratings and it was released in Jan 2009.
 
-Conclusion
+MovieLens 10M dataset <https://grouplens.org/datasets/movielens/10m/>
+
+## Data loading
+
+The downloaded data is split into edx dataset (90%) and validation dataset (10%). The validation dataset is left to final evaluation. The edx dataset was produced using the code provided by the course.
+
+```{r include=FALSE}
+library(tidyverse)
+library(caret)
+library(data.table)
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- fread(text = gsub("::", "\t", 
+                             readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), 
+                          "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding")
+test_index <- createDataPartition(y = movielens$rating, 
+                                  times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+```
+
+## Exploratory analysis
+
+First, I would like to have a little glance of the edx dataset.
+
+```{r}
+head(edx)
+```
+
+```{r}
+range(edx$rating)
+```
+
+In the dataset, "userId" indicates individual users. Some of them rate multiple movies. "movieid" corresponds each movie title. Rating range from 0.5 to 5.0 by 0.5. Each movie is categorized by "genres". But the genres has several words, for example, includes several words, "Action / Crime / Thriller".
+
+The edx dataset has six columns, and 9000055 rows.
+
+```{r}
+dim(edx)
+names(edx)
+```
+
+Regarding rating, its mean is approximately 3.5.
+
+```{r}
+#mean 
+mean(edx$rating)
+```
+
+Its distribution is shown below.
+
+```{r}
+edx %>%
+  ggplot(aes(rating)) + 
+  geom_bar() + 
+  ggtitle("ratings")
+
+```
+
+Considering movie reviews, there are two possibilities; a user rates multiple movies, also some movies get a lot of rates, and some only get a few. To find out, I plot both the number users and movies.
+
+```{r echo=FALSE}
+#users
+edx %>%
+  dplyr::count(userId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() +
+  ggtitle("Users")
+
+```
+
+```{r echo=FALSE}
+#movies
+edx %>% 
+  dplyr::count(movieId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() + 
+  ggtitle("Movies")
+
+```
+
+To find unique number, I use n_distinct().
+
+```{r}
+edx %>% summarize(n_users =n_distinct(userId), n_movies= n_distinct(movieId))
+```
+
+69878 user have been participated in this data, and 10677 movies have been reviewed.
+
+## Model building and RMSE calculation
+
+## Conclusion
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
