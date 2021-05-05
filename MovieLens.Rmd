@@ -131,4 +131,11 @@ edx %>% summarize(n_users =n_distinct(userId), n_movies= n_distinct(movieId))
 
 ## Model building and RMSE calculation
 
+$$
+\mbox{RMSE} = \sqrt{\frac{1}{N} \sum_{u,i}^{} \left( \hat{y}_{u,i} - y_{u,i} \right)^2 }
+$$
+
+
+
+
 ## Conclusion

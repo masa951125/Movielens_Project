@@ -1,28 +1,28 @@
+#R codes
+
+################################################################################
 #used following libraries
 library(tidyverse)
 library(caret)
 library(data.table)
+library(lubridate)
 
 # installing tinytex to knit pdf from rmd files
 install.packages('tinytex')
 tinytex::install_tinytex()
 
 ################################################################################
-# Create edx set, validation set (final hold-out test set)
+#Create edx set, validation set (final hold-out test set). 
+#This code is provided by the course. 
 
 dl <- tempfile()
 download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
-ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
-                 col.names = c("userId", "movieId", "rating", "timestamp"))
-
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),col.names = c("userId", "movieId", "rating", "timestamp"))
 movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
 colnames(movies) <- c("movieId", "title", "genres")
 
-movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
-                                           title = as.character(title),
-                                           genres = as.character(genres))
-
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),title = as.character(title),genres = as.character(genres))
 movielens <- left_join(ratings, movies, by = "movieId")
 
 # Validation set will be 10% of MovieLens data
@@ -41,61 +41,55 @@ removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
-
 ################################################################################
-#Q1
-dim(edx)
+#Find basic information about the dataset.
 
-#Q2
-sum(edx$rating==0)
-sum(edx$rating==3)
+#overall info
 
-#Q3
-n_distinct(edx$movieId)
+head(edx)
+# userId movieId rating timestamp                         title
+# 1:      1     122      5 838985046              Boomerang (1992)
+# 2:      1     185      5 838983525               Net, The (1995)
+# 3:      1     292      5 838983421               Outbreak (1995)
+# 4:      1     316      5 838983392               Stargate (1994)
+# 5:      1     329      5 838983392 Star Trek: Generations (1994)
+# 6:      1     355      5 838984474       Flintstones, The (1994)
 
-#Q4
-n_distinct(edx$userId)
+# genres
+# 1:                Comedy|Romance
+# 2:         Action|Crime|Thriller
+# 3:  Action|Drama|Sci-Fi|Thriller
+# 4:       Action|Adventure|Sci-Fi
+# 5: Action|Adventure|Drama|Sci-Fi
+# 6:       Children|Comedy|Fantasy
 
-#Q5
-dat <- c("Drama", "Comedy", "Thriller", "Romance")
-sapply(dat, function(g){
-  sum(str_detect(edx$genres,g))
-})
-
-#Q6
-edx %>% group_by(movieId, title) %>%
-  summarize(n=n()) %>% 
-  arrange(desc(n))
-
-#Q7, Q8
-edx %>% group_by(rating) %>%
-  summarize(n=n()) %>% 
-  arrange(desc(n))
-################################################################################
-#what kinds of data?
 str(edx)
+#Classes ‘data.table’ and 'data.frame':	9000055 obs. of  6 variables:
+# $ userId   : int  1 1 1 1 1 1 1 1 1 1 ...
+# $ movieId  : num  122 185 292 316 329 355 356 362 364 370 ...
+# $ rating   : num  5 5 5 5 5 5 5 5 5 5 ...
+# $ timestamp: int  838985046 838983525 838983421 838983392 838983392 838984474 838983653 838984885 838983707 838984596 ...
+# $ title    : chr  "Boomerang (1992)" "Net, The (1995)" "Outbreak (1995)" "Stargate (1994)" ...
+#$ genres    : chr  "Comedy|Romance" "Action|Crime|Thriller" "Action|Drama|Sci-Fi|Thriller" "Action|Adventure|Sci-Fi" ...
+# - attr(*, ".internal.selfref")=<externalptr> 
+
 summary(edx)
+# userId         movieId          rating        timestamp        
+# Min.   :    1   Min.   :    1   Min.   :0.500   Min.   :7.897e+08  
+# 1st Qu.:18124   1st Qu.:  648   1st Qu.:3.000   1st Qu.:9.468e+08  
+# Median :35738   Median : 1834   Median :4.000   Median :1.035e+09  
+# Mean   :35870   Mean   : 4122   Mean   :3.512   Mean   :1.033e+09  
+# 3rd Qu.:53607   3rd Qu.: 3626   3rd Qu.:4.000   3rd Qu.:1.127e+09  
+# Max.   :71567   Max.   :65133   Max.   :5.000   Max.   :1.231e+09  
 
-#unique values
-edx %>% summarize(n_users =n_distinct(userId), n_movies= n_distinct(movieId),
-                  n_rating =n_distinct(rating),n_title=n_distinct(title),
-                  n_genres= n_distinct(genres))
+# title              genres         
+# Length:9000055     Length:9000055    
+# Class :character   Class :character  
+# Mode  :character   Mode  :character 
 
-#n_users n_movies n_rating n_title n_genres
-#1   69878    10677       10   10676      797
+#check each column by plotting 
+#1 users
 
-
-#plot
-
-#movies
-edx %>% 
-  dplyr::count(movieId) %>% 
-  ggplot(aes(n)) + 
-  geom_histogram(bins = 30, color = "black") + 
-  scale_x_log10() + 
-  ggtitle("Movies")
-
-#users
 edx %>%
   dplyr::count(userId) %>% 
   ggplot(aes(n)) + 
@@ -103,24 +97,53 @@ edx %>%
   scale_x_log10() +
   ggtitle("Users")
 
-#ratings
+#2 movies
+
+edx %>% 
+  dplyr::count(movieId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() + 
+  ggtitle("Movies")
+
+#3 ratings
+
 edx %>%
   ggplot(aes(rating)) + 
   geom_bar() + 
   ggtitle("ratings")
 
-mean(edx$rating)
+#4 timestamp
+ #these figures need to be changed by lubridate
 
+ #covert "timestamp" to POSIXct data 
+edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01")
+edx <- edx %>% mutate(rate_year = year(timestamp))
+
+validation$timestamp <-as.POSIXct(validation$timestamp, origin= "1970-01-01")
+validation <- validation %>% mutate(rate_year =year(timestamp)) 
+
+#5 title
+ #at a glance, they seem to have significance, but they have release year.
+ #try to pick up the release years.
+
+edx <- edx %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
+validation <- validation %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
+
+#6 genres
+
+################################################################################
 #test and training data
+
 set.seed(2021, sample.kind = "Rounding") 
-test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.2, 
-                                  list = FALSE)
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.2, list = FALSE)
 train_set <- edx[-test_index,]
 test_set <- edx[test_index,]
 
-#To make sure we don’t include users and movies in the test set 
-#that do not appear in the training set, 
-#we remove these entries using the semi_join function:
+ #To make sure we don’t include users and movies in the test set 
+ #that do not appear in the training set, 
+ #we remove these entries using the semi_join function:
+
 test_set <- test_set %>% 
   semi_join(train_set, by = "movieId") %>%
   semi_join(train_set, by = "userId")
@@ -130,15 +153,18 @@ RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
 
-#1 Naive model assuming the same rating for all movies. 
-mu_hat <- mean(train_set$rating)
-naive_rmse <- RMSE(test_set$rating, mu_hat)
+################################################################################
+#1 Naive model assuming the same rating for all movies.
+
+mu <- mean(train_set$rating)
+naive_rmse <- RMSE(test_set$rating, mu)
 naive_rmse
 #>[1] 1.059586
 
+################################################################################
 #2 movie effects
-mu <- mean(train_set$rating)
 
+mu <- mean(train_set$rating)
 movie_avg <- train_set %>%
   group_by(movieId)%>%
   summarize(b_i =mean(rating -mu))
@@ -151,6 +177,7 @@ movie_effect_rmse <- RMSE(test_set$rating, movie_effect_pred)
 movie_effect_rmse
 #[1] 0.9434034
 
+################################################################################
 #3 user effects
 
 user_avg <- train_set %>%
@@ -168,19 +195,243 @@ movie_user_effect_rmse <- RMSE(test_set$rating, movie_user_effect_pred)
 movie_user_effect_rmse
 #[1] 0.8660241
 
+################################################################################
+#can be cut later
 
-# dealing with validation file
+# dealing with validation file, 
+#To make sure we don’t include users and movies in the validation set 
+#that do not appear in the training set, 
+#we remove these entries using the semi_join function:
 
-valid_pred_rating <- validation %>%
+test_val <- validation %>% 
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId")
+
+
+valid_pred_rating <- test_val %>%
   left_join(movie_avg, by="movieId") %>%
   left_join(user_avg, by="userId") %>%
   mutate(pred = mu + b_i + b_u)%>%
   pull(pred)
 
-#replace NA by mu
-sum(is.na(valid_pred_rating))
-#there is 11 NAs in the valid_pred_rating. Thus replace them with mean rating
-valid_pred_rating <- replace(valid_pred_rating, which(is.na(valid_pred_rating)), mu)
+RMSE(test_val$rating, valid_pred_rating)
+#[1] 0.8663868
 
-RMSE(validation$rating,valid_pred_rating)
-#[1] 0.8663858
+################################################################################
+#4 regularization 
+
+#introducing lambda
+
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+  
+  b_i <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  
+  b_u <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+
+  predicted_ratings <- 
+    test_set %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    mutate(pred = mu + b_i + b_u) %>%
+    pull(pred)
+  
+  return(RMSE(predicted_ratings, test_set$rating))
+})
+
+qplot(lambdas,rmses)
+
+lambda <- lambdas[which.min(rmses)]
+
+rmses[4.75]
+#[1] 0.8657669
+
+###############################################################################
+#5 introducing other factors (genres, release_year, rate_year )
+
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+  
+  b_i <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  
+  b_u <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  
+  y <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    group_by(release_year) %>%
+    summarize(y = sum(rating - b_i -b_u - mu)/(n()+l),n_y=n()) 
+
+  g <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    left_join(y, by="release_year")%>%
+    group_by(genres) %>%
+    summarize(g = sum(rating - b_i -b_u -y - mu)/(n()+l), n_g=n())  
+  
+  predicted_ratings <- 
+    test_set %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    left_join(g, by="genres") %>%
+    left_join(y, by="release_year")%>%
+    mutate(pred = mu + b_i + b_u + g + y) %>%
+    pull(pred)
+  return(RMSE(predicted_ratings, test_set$rating))
+})
+
+
+
+
+
+
+rmses <- sapply(lambdas, function(l){
+
+    mu <- mean(train_set$rating) 
+  
+    b_i <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/((n()+l), n_i =n())
+  
+    b_u <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l), n_u=n())
+
+    g <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    group_by(genres) %>%
+    summarize(g = sum(rating - b_i -b_u - mu)/(n()+l), n_g=n())  
+
+    y <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    left_join(g, by="genres") %>%
+    group_by(release_year) %>%
+    summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+l),n_y=n()) 
+
+    predicted_ratings <- 
+    test_set %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    left_join(g, by="genres") %>%
+    left_join(y, by="release_year")%>%
+    mutate(pred = mu + b_i + b_u + g + y) %>%
+    pull(pred)
+  
+    return(RMSE(predicted_ratings, test_set$rating))
+}
+#[1] 0.8648925
+
+
+
+#applying to the validation set
+val_predicted_ratings <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+  
+  b_i <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  
+  b_u <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  
+  g <- train_set %>%
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    group_by(genres) %>%
+    summarize(g = sum(rating -b_i - b_u - mu)/(n()+1))
+  
+  val_predicted_ratings <- 
+    test_val %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    left_join(g, by = "genres") %>%
+    mutate(pred = mu + b_i + b_u +g) %>%
+    pull(pred)
+  
+  return(val_predicted_ratings)
+})
+
+sum(is.na(val_predicted_ratings))
+RMSE(test_val$rating, val_predicted_ratings)
+
+
+
+
+
+
+#4 genre effects
+genre_avg <- train_set %>%
+  left_join(movie_avg, by= "movieId") %>%
+  left_join(user_avg, by="userId")%>%
+  group_by(genres) %>%
+  summarize(g = mean(rating- mu -b_i-b_u))
+
+genre_effect_pred <- test_set %>%
+  left_join(movie_avg, by="movieId") %>%
+  left_join(user_avg, by="userId") %>%
+  left_join(genre_avg, by="genres")%>%
+  mutate(pred = mu + b_i + b_u +g)%>%
+  pull(pred)
+
+genre_effect_rmse <- RMSE(test_set$rating, genre_effect_pred)
+genre_effect_rmse
+#[1] 0.8656792
+
+
+################################################################################  
+#can be cut later
+# dealing with validation file
+
+test_val <- validation %>% 
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId") %>%
+  semi_join(train_set, by= "genres")
+
+valid_pred_rating <-test_val %>%
+  left_join(movie_avg, by="movieId") %>%
+  left_join(user_avg, by="userId") %>%
+  left_join(genre_avg, by="genres")%>%
+  mutate(pred = mu + b_i + b_u +g)%>%
+  pull(pred)
+
+RMSE(test_val$rating, valid_pred_rating)
+#[1] 0.8659856
+
+################################################################################
+can be used later
+
+#some ratings are more than 5.0. The values more than 5.0 should be replaced by 5.0
+sum(valid_pred_rating>5.0)
+revised_pred_rating <-replace(valid_pred_rating, which(valid_pred_rating>5.0),5.0)
+
+RMSE(test_val$rating,revised_pred_rating)
+#[1] 0.8658008
+################################################################################
+
+
+val_predicted_ratings <- replace(val_predicted_ratings, which(val_predicted_ratings >5.0), 5.0)
+RMSE(test_val$rating, val_predicted_ratings)
+#[1] 0.8653515
+
