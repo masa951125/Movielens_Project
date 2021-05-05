@@ -130,6 +130,7 @@ validation <- validation %>% mutate(rate_year =year(timestamp))
 edx <- edx %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
 validation <- validation %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
 
+edx %>% ggplot(aes(release_year, rating)) +geom_point() +geom_smooth(method = "loess")
 #6 genres
 
 ################################################################################
@@ -193,7 +194,7 @@ movie_user_effect_pred <- test_set %>%
 
 movie_user_effect_rmse <- RMSE(test_set$rating, movie_user_effect_pred)
 movie_user_effect_rmse
-#[1] 0.8660241
+#[1] 0.8646844
 
 ################################################################################
 #can be cut later
@@ -251,13 +252,13 @@ qplot(lambdas,rmses)
 
 lambda <- lambdas[which.min(rmses)]
 
-rmses[4.75]
-#[1] 0.8657669
+rmses[5]
+#[1] 0.8644477
 
 ###############################################################################
 #5 introducing other factors (genres, release_year, rate_year )
 
- #using lambda= 4.75
+ #using lambda= 5
 
 mu <- mean(train_set$rating) 
   
@@ -268,20 +269,20 @@ b_i <- train_set %>%
 b_u <- train_set %>% 
     left_join(b_i, by="movieId") %>%
     group_by(userId) %>%
-    summarize(b_u = sum(rating - b_i - mu)/(n()+l), n_u=n())
+    summarize(b_u = sum(rating - b_i - mu)/(n()+lambda), n_u=n())
 
 g <- train_set %>% 
     left_join(b_i, by="movieId") %>%
     left_join(b_u, by="userId") %>%
     group_by(genres) %>%
-    summarize(g = sum(rating - b_i -b_u - mu)/(n()+l), n_g=n())  
+    summarize(g = sum(rating - b_i -b_u - mu)/(n()+lambda), n_g=n())  
 
 y <- train_set %>% 
     left_join(b_i, by="movieId") %>%
     left_join(b_u, by="userId") %>%
     left_join(g, by="genres") %>%
     group_by(release_year) %>%
-    summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+l),n_y=n()) 
+    summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+lambda),n_y=n()) 
 
 
 predicted_ratings <-test_set %>% 
@@ -293,7 +294,7 @@ predicted_ratings <-test_set %>%
     pull(pred)
   
 RMSE(predicted_ratings, test_set$rating)
-#[1] 0.8648925
+#[1] 0.86365
 ###############################################################################
 #applying to the validation set
  
@@ -314,22 +315,15 @@ valid_pred_rating <-test_val %>%
   pull(pred)
 
 RMSE(test_val$rating, valid_pred_rating)
-#[1] 0.8651354
+#[1] 0.8646954
 
 ################################################################################
-#some ratings are more than 5.0. The values more than 5.0 should be replaced by 5.0
+#some ratings are more than 5.0. 
+#The values more than 5.0 should be replaced by 5.0
 
 sum(valid_pred_rating>5.0)
 revised_pred_rating <-replace(valid_pred_rating, which(valid_pred_rating>5.0),5.0)
 
 RMSE(test_val$rating,revised_pred_rating)
-#[1] 0.8650386
+#[1] 0.8646006
 ################################################################################
-
-r_y <-train_set %>% 
-  left_join(b_i, by="movieId") %>%
-  left_join(b_u, by="userId") %>%
-  left_join(g, by="genres") %>%
-  left_join(y, by="release_year")%>%
-  group_by(rate_year) %>%
-  summarize(r_y = sum(rating - b_i -b_u -g - y - mu)/(n()+l),n_ry=n()) 
