@@ -18,7 +18,9 @@ tinytex::install_tinytex()
 dl <- tempfile()
 download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
-ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),col.names = c("userId", "movieId", "rating", "timestamp"))
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+
 movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
 colnames(movies) <- c("movieId", "title", "genres")
 
@@ -26,7 +28,7 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),title =
 movielens <- left_join(ratings, movies, by = "movieId")
 
 # Validation set will be 10% of MovieLens data
-set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+set.seed(1, sample.kind="Rounding") 
 test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
 edx <- movielens[-test_index,]
 temp <- movielens[test_index,]
@@ -88,6 +90,7 @@ summary(edx)
 # Mode  :character   Mode  :character 
 
 #check each column by plotting 
+
 #1 users
 
 edx %>%
@@ -117,21 +120,40 @@ edx %>%
  #these figures need to be changed by lubridate
 
  #covert "timestamp" to POSIXct data 
-edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01")
-edx <- edx %>% mutate(rate_year = year(timestamp))
+# edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01")
+# edx <- edx %>% mutate(rate_year = year(timestamp))
 
-validation$timestamp <-as.POSIXct(validation$timestamp, origin= "1970-01-01")
-validation <- validation %>% mutate(rate_year =year(timestamp)) 
+#validation$timestamp <-as.POSIXct(validation$timestamp, origin= "1970-01-01")
+#validation <- validation %>% mutate(rate_year =year(timestamp)) 
+edx <- edx %>% select(-timestamp)
 
 #5 title
- #at a glance, they seem to have significance, but they have release year.
+ #at a glance, they seem not to have significance, but they have release year.
  #try to pick up the release years.
 
 edx <- edx %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
-validation <- validation %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
+edx %>% group_by(release_year) %>%
+  summarize(ratings = mean(rating)) %>% 
+  ggplot(aes(release_year, ratings)) +
+  geom_point()+geom_smooth(method="lm")+
+  ggtitle("release_year")
 
-edx %>% ggplot(aes(release_year, rating)) +geom_point() +geom_smooth(method = "loess")
 #6 genres
+
+edx$genres %>% n_distinct()
+
+edx %>% group_by(genres)%>%
+  summarize(ratings = mean(rating))
+
+edx %>% group_by(genres) %>%
+  summarize(n = n(), avg = mean(rating)) %>%
+  filter(n >= 20000) %>% 
+  mutate(genres = reorder(genres,avg)) %>%
+  ggplot(aes(x = genres, y = avg)) + 
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("genres (n>20000)")
+
 
 ################################################################################
 #test and training data
@@ -195,28 +217,6 @@ movie_user_effect_pred <- test_set %>%
 movie_user_effect_rmse <- RMSE(test_set$rating, movie_user_effect_pred)
 movie_user_effect_rmse
 #[1] 0.8646844
-
-################################################################################
-#can be cut later
-
-# dealing with validation file, 
-#To make sure we don’t include users and movies in the validation set 
-#that do not appear in the training set, 
-#we remove these entries using the semi_join function:
-
-test_val <- validation %>% 
-  semi_join(train_set, by = "movieId") %>%
-  semi_join(train_set, by = "userId")
-
-
-valid_pred_rating <- test_val %>%
-  left_join(movie_avg, by="movieId") %>%
-  left_join(user_avg, by="userId") %>%
-  mutate(pred = mu + b_i + b_u)%>%
-  pull(pred)
-
-RMSE(test_val$rating, valid_pred_rating)
-#[1] 0.8663868
 
 ################################################################################
 #4 regularization 
@@ -299,6 +299,8 @@ RMSE(predicted_ratings, test_set$rating)
 #applying to the validation set
  
 # dealing with validation file
+validation <- validation %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
+validation <- validation %>% select(-timestamp)
 
 test_val <- validation %>% 
   semi_join(train_set, by = "movieId") %>%
