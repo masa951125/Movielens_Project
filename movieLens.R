@@ -305,14 +305,20 @@ reg_movie_user_genre_year_rmse <-RMSE(predicted_ratings, test_set$rating)
 reg_movie_user_genre_year_rmse
 #[1] 0.86365
 
-#some ratings are more than 5.0. 
-#The values more than 5.0 should be replaced by 5.0
+#some ratings are more than 5.0, and some are less than 0
+#The values more than 5.0 should be replaced by 5.0, and less than 0 by 0.
 
 sum(predicted_ratings>5.0)
+#[1] 1481
+sum(predicted_ratings<0)
+#[1] 4
+
 revised_predicted_ratings <-replace(predicted_ratings, which(predicted_ratings>5.0),5.0)
+revised_predicted_ratings <-replace(revised_predicted_ratings, which(revised_predicted_ratings<0),0)
+
 rev_reg_movie_user_genre_year_rmse <-RMSE(test_set$rating,revised_predicted_ratings)
 rev_reg_movie_user_genre_year_rmse
-#[1] 0.8635418
+#[1] 0.8635411
 
 ###############################################################################
 #applying to the validation set
@@ -339,13 +345,18 @@ validation_rmse <- RMSE(test_val$rating, valid_pred_rating)
 validation_rmse
 #[1] 0.8646954
 
-#some ratings are more than 5.0. 
-#The values more than 5.0 should be replaced by 5.0
+#some ratings are more than 5.0, and some are less than 0
+#The values more than 5.0 should be replaced by 5.0, and less than 0 by 0.
 
-sum(valid_pred_rating>5.0)
-revised_valid_pred_rating <-replace(valid_pred_rating, which(valid_pred_rating>5.0),5.0)
+sum(valid_pred_rating >5.0)
+#[1] 1639
+sum(valid_pred_rating <0)
+#[1] 10
+
+revised_valid_pred_rating <-replace(valid_pred_rating, which(valid_pred_rating >5.0),5)
+revised_valid_pred_rating <-replace(revised_valid_pred_rating, which(revised_valid_pred_rating < 0),0)
 
 revised_validation_rmse <-RMSE(test_val$rating,revised_valid_pred_rating)
 revised_validation_rmse
-#[1] 0.8646006
+#[1] 0.8645993
 ################################################################################
