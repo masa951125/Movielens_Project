@@ -118,15 +118,16 @@ edx %>%
 
 #4 timestamp
  #these figures need to be changed by lubridate
+ #covert "timestamp" to POSIXct data, and find months of ratings.
 
- #covert "timestamp" to POSIXct data 
-# edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01")
-# edx <- edx %>% mutate(rate_year = year(timestamp))
-
-#validation$timestamp <-as.POSIXct(validation$timestamp, origin= "1970-01-01")
-#validation <- validation %>% mutate(rate_year =year(timestamp)) 
-edx <- edx %>% select(-timestamp)
-
+edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01")
+edx <- edx %>% mutate(date = round_date(timestamp, unit = "month"))  
+edx%>%
+  group_by(date) %>%
+  summarize(ratings =mean(rating)) %>% 
+  ggplot(aes(x = date, y=ratings)) +geom_point() + geom_smooth(method = "lm")
+  ggtitle("Months of rating")
+  
 #5 title
  #at a glance, they seem not to have significance, but they have release year.
  #try to pick up the release years.
@@ -137,6 +138,10 @@ edx %>% group_by(release_year) %>%
   ggplot(aes(release_year, ratings)) +
   geom_point()+geom_smooth(method="lm")+
   ggtitle("release_year")
+
+#compared to months of ratings, it seems to have significance in predicting rating.
+#to reduce data size, I remove the columns, date and timestamp.
+edx <- edx %>% select(-timestamp, -date)
 
 #6 genres
 
@@ -153,7 +158,6 @@ edx %>% group_by(genres) %>%
   geom_point() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
   ggtitle("genres (n>20000)")
-
 
 ################################################################################
 #test and training data
@@ -188,7 +192,7 @@ naive_rmse
 #2 movie effects
 
 mu <- mean(train_set$rating)
-movie_avg <- train_set %>%
+b_i <- train_set %>%
   group_by(movieId)%>%
   summarize(b_i =mean(rating -mu))
 
@@ -203,7 +207,7 @@ movie_effect_rmse
 ################################################################################
 #3 user effects
 
-user_avg <- train_set %>%
+b_u <- train_set %>%
   left_join(movie_avg, by= "movieId") %>%
   group_by(userId) %>%
   summarize(b_u = mean(rating- mu -b_i))
@@ -251,14 +255,19 @@ rmses <- sapply(lambdas, function(l){
 qplot(lambdas,rmses)
 
 lambda <- lambdas[which.min(rmses)]
+lambda
+#[1] 5
 
-rmses[5]
+reg_movie_user_rmse <- rmses
+reg_movie_user_rmse[5]
 #[1] 0.8644477
 
 ###############################################################################
-#5 introducing other factors (genres, release_year, rate_year )
+#5 introducing other factors (genres, release_year)
 
  #using lambda= 5
+lambda
+#[1] 5
 
 mu <- mean(train_set$rating) 
   
@@ -284,7 +293,6 @@ y <- train_set %>%
     group_by(release_year) %>%
     summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+lambda),n_y=n()) 
 
-
 predicted_ratings <-test_set %>% 
     left_join(b_i, by = "movieId") %>%
     left_join(b_u, by = "userId") %>%
@@ -293,8 +301,19 @@ predicted_ratings <-test_set %>%
     mutate(pred = mu + b_i + b_u + g + y) %>%
     pull(pred)
   
-RMSE(predicted_ratings, test_set$rating)
+reg_movie_user_genre_year_rmse <-RMSE(predicted_ratings, test_set$rating)
+reg_movie_user_genre_year_rmse
 #[1] 0.86365
+
+#some ratings are more than 5.0. 
+#The values more than 5.0 should be replaced by 5.0
+
+sum(predicted_ratings>5.0)
+revised_predicted_ratings <-replace(predicted_ratings, which(predicted_ratings>5.0),5.0)
+rev_reg_movie_user_genre_year_rmse <-RMSE(test_set$rating,revised_predicted_ratings)
+rev_reg_movie_user_genre_year_rmse
+#[1] 0.8635418
+
 ###############################################################################
 #applying to the validation set
  
@@ -316,16 +335,17 @@ valid_pred_rating <-test_val %>%
   mutate(pred = mu + b_i + b_u +g +y)%>%
   pull(pred)
 
-RMSE(test_val$rating, valid_pred_rating)
+validation_rmse <- RMSE(test_val$rating, valid_pred_rating)
+validation_rmse
 #[1] 0.8646954
 
-################################################################################
 #some ratings are more than 5.0. 
 #The values more than 5.0 should be replaced by 5.0
 
 sum(valid_pred_rating>5.0)
-revised_pred_rating <-replace(valid_pred_rating, which(valid_pred_rating>5.0),5.0)
+revised_valid_pred_rating <-replace(valid_pred_rating, which(valid_pred_rating>5.0),5.0)
 
-RMSE(test_val$rating,revised_pred_rating)
+revised_validation_rmse <-RMSE(test_val$rating,revised_valid_pred_rating)
+revised_validation_rmse
 #[1] 0.8646006
 ################################################################################
