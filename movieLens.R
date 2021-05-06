@@ -192,7 +192,7 @@ naive_rmse
 #2 movie effects
 
 mu <- mean(train_set$rating)
-b_i <- train_set %>%
+movie_avg <- train_set %>%
   group_by(movieId)%>%
   summarize(b_i =mean(rating -mu))
 
@@ -207,7 +207,7 @@ movie_effect_rmse
 ################################################################################
 #3 user effects
 
-b_u <- train_set %>%
+user_avg <- train_set %>%
   left_join(movie_avg, by= "movieId") %>%
   group_by(userId) %>%
   summarize(b_u = mean(rating- mu -b_i))
@@ -233,19 +233,19 @@ rmses <- sapply(lambdas, function(l){
   
   mu <- mean(train_set$rating)
   
-  b_i <- train_set %>% 
+  reg_movie_avg <- train_set %>% 
     group_by(movieId) %>%
     summarize(b_i = sum(rating - mu)/(n()+l))
   
-  b_u <- train_set %>% 
-    left_join(b_i, by="movieId") %>%
+  reg_user_avg <- train_set %>% 
+    left_join(reg_movie_avg, by="movieId") %>%
     group_by(userId) %>%
     summarize(b_u = sum(rating - b_i - mu)/(n()+l))
 
   predicted_ratings <- 
     test_set %>% 
-    left_join(b_i, by = "movieId") %>%
-    left_join(b_u, by = "userId") %>%
+    left_join(reg_movie_avg, by = "movieId") %>%
+    left_join(reg_user_avg ,by = "userId") %>%
     mutate(pred = mu + b_i + b_u) %>%
     pull(pred)
   
@@ -271,33 +271,33 @@ lambda
 
 mu <- mean(train_set$rating) 
   
-b_i <- train_set %>% 
+reg_movie_avg <- train_set %>% 
     group_by(movieId) %>%
     summarize(b_i = sum(rating - mu)/(n()+lambda), n_i =n())
   
-b_u <- train_set %>% 
-    left_join(b_i, by="movieId") %>%
+reg_user_avg <- train_set %>% 
+    left_join(reg_user_avg, by="movieId") %>%
     group_by(userId) %>%
     summarize(b_u = sum(rating - b_i - mu)/(n()+lambda), n_u=n())
 
-g <- train_set %>% 
-    left_join(b_i, by="movieId") %>%
-    left_join(b_u, by="userId") %>%
+g_avg <- train_set %>% 
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
     group_by(genres) %>%
     summarize(g = sum(rating - b_i -b_u - mu)/(n()+lambda), n_g=n())  
 
-y <- train_set %>% 
-    left_join(b_i, by="movieId") %>%
-    left_join(b_u, by="userId") %>%
-    left_join(g, by="genres") %>%
+y_avg <- train_set %>% 
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
+    left_join(g_avg, by="genres") %>%
     group_by(release_year) %>%
     summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+lambda),n_y=n()) 
 
 predicted_ratings <-test_set %>% 
-    left_join(b_i, by = "movieId") %>%
-    left_join(b_u, by = "userId") %>%
-    left_join(g, by="genres") %>%
-    left_join(y, by="release_year")%>%
+    left_join(reg_movie_avg, by = "movieId") %>%
+    left_join(reg_user_avg, by = "userId") %>%
+    left_join(g_avg, by="genres") %>%
+    left_join(y_avg, by="release_year")%>%
     mutate(pred = mu + b_i + b_u + g + y) %>%
     pull(pred)
   
@@ -327,13 +327,14 @@ rev_reg_movie_user_genre_year_rmse
 validation <- validation %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
 validation <- validation %>% select(-timestamp)
 
+
 test_val <- validation %>% 
   semi_join(train_set, by = "movieId") %>%
   semi_join(train_set, by = "userId") %>%
   semi_join(train_set, by= "genres") %>%
   semi_join(train_set, by="release_year")
 
-valid_pred_rating <-test_val %>%
+valid_pred_rating <-validation %>%
   left_join(b_i, by = "movieId") %>%
   left_join(b_u, by = "userId") %>%
   left_join(g, by="genres") %>%
@@ -341,7 +342,9 @@ valid_pred_rating <-test_val %>%
   mutate(pred = mu + b_i + b_u +g +y)%>%
   pull(pred)
 
-validation_rmse <- RMSE(test_val$rating, valid_pred_rating)
+dat <- validation[which(is.na(valid_pred_rating))]
+
+validation_rmse <- RMSE(validation$rating, valid_pred_rating)
 validation_rmse
 #[1] 0.8646954
 
@@ -360,3 +363,117 @@ revised_validation_rmse <-RMSE(test_val$rating,revised_valid_pred_rating)
 revised_validation_rmse
 #[1] 0.8645993
 ################################################################################
+#revised
+
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+
+  reg_movie_avg <- train_set %>% 
+  group_by(movieId) %>%
+  summarize(b_i = sum(rating - mu)/(n()+l))
+
+  reg_user_avg <- train_set %>% 
+  left_join(reg_movie_avg, by="movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+
+  g_avg <- train_set %>% 
+  left_join(reg_movie_avg, by="movieId") %>%
+  left_join(reg_user_avg, by="userId") %>%
+  group_by(genres) %>%
+  summarize(g = sum(rating - b_i -b_u - mu)/(n()+l))  
+
+  y_avg <- train_set %>% 
+  left_join(reg_movie_avg, by="movieId") %>%
+  left_join(reg_user_avg, by="userId") %>%
+  left_join(g_avg, by="genres") %>%
+  group_by(release_year) %>%
+  summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+l)) 
+
+  predicted_ratings <-test_set %>% 
+  left_join(reg_movie_avg, by = "movieId") %>%
+  left_join(reg_user_avg, by = "userId") %>%
+  left_join(g_avg, by="genres") %>%
+  left_join(y_avg, by="release_year")%>%
+  mutate(pred = mu + b_i + b_u + g + y) %>%
+  pull(pred)
+  
+  return(RMSE(predicted_ratings, test_set$rating))
+})
+
+qplot(lambdas,rmses)
+lambda <- lambdas[which.min(rmses)]
+lambda
+#[1] 4.5
+
+min(rmses)
+#[1] 0.8636478
+################################################################################
+test_val <- validation %>% 
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId") %>%
+  semi_join(train_set, by= "genres") %>%
+  semi_join(train_set, by="release_year")
+
+
+sum(is.na(validation))
+
+val_pred <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+  
+  reg_movie_avg <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  
+  reg_user_avg <- train_set %>% 
+    left_join(reg_movie_avg, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  
+  g_avg <- train_set %>% 
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
+    group_by(genres) %>%
+    summarize(g = sum(rating - b_i -b_u - mu)/(n()+l))  
+  
+  y_avg <- train_set %>% 
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
+    left_join(g_avg, by="genres") %>%
+    group_by(release_year) %>%
+    summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+l)) 
+  
+  val_pred <-validation %>% 
+    left_join(reg_movie_avg, by = "movieId") %>%
+    left_join(reg_user_avg, by = "userId") %>%
+    left_join(g_avg, by="genres") %>%
+    left_join(y_avg, by="release_year")%>%
+    mutate(pred = mu + b_i + b_u + g + y) %>%
+    pull(pred)
+})
+
+sum(is.na(val_pred))
+
+val_pred <-replace(val_pred, is.na(val_pred),mu)
+
+RMSE(val_pred, validation$rating)
+#[1] 0.8648388
+
+
+qplot(lambdas,val_rmses)
+lambda <- lambdas[which.min(val_rmses)]
+lambda
+min(val_rmses)
+#[1] 0.8646954
+
+val_predicted_ratings <-validation %>% 
+  left_join(reg_movie_avg, by = "movieId") %>%
+  left_join(reg_user_avg, by = "userId") %>%
+  left_join(g_avg, by="genres") %>%
+  left_join(y_avg, by="release_year")%>%
+  mutate(pred = mu + b_i + b_u + g + y) %>%
+  pull(pred)
