@@ -2,14 +2,15 @@
 
 ################################################################################
 #used following libraries
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
+
 library(tidyverse)
 library(caret)
 library(data.table)
 library(lubridate)
-
-# installing tinytex to knit pdf from rmd files
-install.packages('tinytex')
-tinytex::install_tinytex()
 
 ################################################################################
 #Create edx set, validation set (final hold-out test set). 
@@ -188,6 +189,9 @@ naive_rmse <- RMSE(test_set$rating, mu)
 naive_rmse
 #[1] 1.060054
 
+rmse_results <- tibble(method = "Rating Average", RMSE = naive_rmse)%>% as.data.frame()
+rmse_results
+
 ################################################################################
 #2 movie effects
 
@@ -204,8 +208,12 @@ movie_effect_rmse <- RMSE(test_set$rating, movie_effect_pred)
 movie_effect_rmse
 #[1] 0.9429615
 
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Movie Effects Model",  
+                                     RMSE =movie_effect_rmse))%>% as.data.frame()
+rmse_results
 ################################################################################
-#3 user effects
+#3 movie and user effects
 
 user_avg <- train_set %>%
   left_join(movie_avg, by= "movieId") %>%
@@ -222,8 +230,64 @@ movie_user_effect_rmse <- RMSE(test_set$rating, movie_user_effect_pred)
 movie_user_effect_rmse
 #[1] 0.8646844
 
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Movie User Effects Model",  
+                                 RMSE =movie_user_effect_rmse))%>% as.data.frame()
+rmse_results
+
 ################################################################################
-#4 regularization 
+#4 genre effects
+
+g_avg <- train_set %>%
+  left_join(movie_avg, by= "movieId")%>%
+  left_join(user_avg, by="userId") %>%
+  group_by(genres) %>%
+  summarize(g = mean(rating- mu -b_i -b_u))
+
+movie_user_genre_effect_pred <- test_set %>%
+  left_join(movie_avg, by="movieId") %>%
+  left_join(user_avg, by="userId") %>%
+  left_join(g_avg, by="genres") %>%
+  mutate(pred = mu + b_i + b_u + g)%>%
+  pull(pred)
+
+movie_user_genre_effect_rmse <- RMSE(test_set$rating, movie_user_genre_effect_pred)
+movie_user_genre_effect_rmse
+#[1] 0.8643242
+
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Movie User Genre Effects Model",  
+                                 RMSE =movie_user_genre_effect_rmse))%>% as.data.frame()
+rmse_results
+
+################################################################################
+#5 release year effects
+
+y_avg <- train_set %>%
+  left_join(movie_avg, by= "movieId")%>%
+  left_join(user_avg, by="userId") %>%
+  left_join(g_avg, by="genres") %>%
+  group_by(release_year) %>%
+  summarize(y = mean(rating- mu -b_i -b_u -g))
+
+movie_user_genre_year_effect_pred <- test_set %>%
+  left_join(movie_avg, by="movieId") %>%
+  left_join(user_avg, by="userId") %>%
+  left_join(g_avg, by="genres") %>%
+  left_join(y_avg, by="release_year")%>%
+  mutate(pred = mu + b_i + b_u + g +y)%>%
+  pull(pred)
+
+movie_user_genre_year_effect_rmse <- RMSE(test_set$rating, movie_user_genre_year_effect_pred)
+movie_user_genre_year_effect_rmse
+#[1] 0.8641262
+
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Movie User Genre Release Year Effects Model",  
+                                 RMSE =movie_user_genre_year_effect_rmse))%>% as.data.frame()
+rmse_results
+################################################################################
+#6 regularization (movie, user) 
 
 #introducing lambda
 
@@ -262,8 +326,12 @@ reg_movie_user_rmse <- rmses
 reg_movie_user_rmse[5]
 #[1] 0.8644477
 
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Reg Movie User Effects Model",  
+                                 RMSE =reg_movie_user_rmse[5]))%>% as.data.frame()
+rmse_results
 ###############################################################################
-#5 introducing other factors (genres, release_year)
+#7 regularization  (movie, user,genres, release_year)
 
 #calculating lambda
 
@@ -313,6 +381,23 @@ lambda
 
 min(rmses)
 #[1] 0.8636478
+
+#model summary
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Reg Movie User Genre Release Year Effects Model",  
+                                 RMSE =rmses[4.5]))%>% as.data.frame()
+rmse_results
+rmse_results %>% knitr::kable()
+
+#  |method                                          |      RMSE|
+#  |:-----------------------------------------------|---------:|
+#  |Rating Average                                  | 1.0600537|
+#  |Movie Effects Model                             | 0.9429615|
+#  |Movie User Effects Model                        | 0.8646844|
+#  |Movie User Genre Effects Model                  | 0.8643242|
+#  |Movie User Genre Release Year Effects Model     | 0.8641262|
+#  |Reg Movie User Effects Model                    | 0.8644477|
+#  |Reg Movie User Genre Release Year Effects Model | 0.8639532|
 
 ################################################################################
 #validation calculating lambda
@@ -371,6 +456,10 @@ min(val_rmses)
 #[1] 0.8646954
 
 ################################################################################
+# installing tinytex to knit pdf from rmd files
+install.packages(c('tinytex', 'rmarkdown'))
+tinytex::install_tinytex()
+
 # other methods
 #using lambda= 5
 lambda
