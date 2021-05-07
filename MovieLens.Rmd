@@ -10,44 +10,36 @@ output:
 
 ## Introduction
 
-For this project, I will be creating a movie recommendation system using the MovieLens dataset.
+Nowadays, recommendation systems have become common to us. Products and services are rated by consumers using stars and points, then accumulate into dataset. These ratings are precious; they are not only helpful for new customers to choose good or services, but also valuable for makers and service providers in terms of predicting future consumer behaviors. If you explore a user ratings in detail, you will find his/her preference, recommend things which are most likely to be bought.They enable a targeted marketing.
 
-## Dataset
+In this paper, I will take a movie recommendation dataset, MovieLens, and build a model which will predict rating as accurately as possible.
 
-The data used in this report is available at the Grouplens website. The data size was reduced from the original MovieLens data. It has 1 million movie ratings and it was released in Jan 2009.
+#### 1 Dataset
+
+The data used in this report, MovieLens 10M Dataset, is available at the Grouplens website. The site says this data set has 10000054 ratings and 95580 tags applied to 10681 movies by 71567 users of the online movie recommender service MovieLens.
 
 MovieLens 10M dataset <https://grouplens.org/datasets/movielens/10m/>
 
-## Data loading
-
-The downloaded data is split into edx dataset (90%) and validation dataset (10%). The validation dataset is left to final evaluation. The edx dataset was produced using the code provided by the course.
-
 ```{r include=FALSE}
-library(tidyverse)
-library(caret)
-library(data.table)
-
 dl <- tempfile()
 download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
-ratings <- fread(text = gsub("::", "\t", 
-                             readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
                  col.names = c("userId", "movieId", "rating", "timestamp"))
-movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), 
-                          "\\::", 3)
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
 colnames(movies) <- c("movieId", "title", "genres")
-movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
-                                           title = as.character(title),
-                                           genres = as.character(genres))
+
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),title = as.character(title),genres = as.character(genres))
 movielens <- left_join(ratings, movies, by = "movieId")
 
 # Validation set will be 10% of MovieLens data
-set.seed(1, sample.kind="Rounding")
-test_index <- createDataPartition(y = movielens$rating, 
-                                  times = 1, p = 0.1, list = FALSE)
+set.seed(1, sample.kind="Rounding") 
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
 edx <- movielens[-test_index,]
 temp <- movielens[test_index,]
 
+# Make sure userId and movieId in validation set are also in edx set
 validation <- temp %>% 
   semi_join(edx, by = "movieId") %>%
   semi_join(edx, by = "userId")
@@ -59,11 +51,29 @@ edx <- rbind(edx, removed)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 ```
 
+#### 2 Goal
+
+The goal is to train a machine learning algorithm to predict movie ratings based on factors in the provided dataset. To achieve this, the downloaded data is split into two, edx dataset (90%) and validation dataset (10%). The validation dataset is left to final evaluation.
+
+As GroupLens web site explains, it has several factors, such as user ID, movie title, genres, rating as well. The assumption is that they are inter-correlated to some extent and helpful to forecast ratings. The challenge of a recommendation system, however, is that the data is sparse and each factor in the dataset might affect others. Namely, some users rate movies more than others, and some movies are rated more. Genres, released year may also affect ratings.
+
+Therefore, a linear regression will be used to find weights that minimize the residual mean squared error, the RMSE. Predictors are user ID, movie ID, genres. and released year. In addition to this, regulation is used to penalize large estimates that are produced using small sample sizes.
+
+RMSE is denoted as follows;
+
+$$
+\mbox{RMSE} = \sqrt{\frac{1}{N} \sum_{u,i}^{} \left( \hat{y}_{u,i} - y_{u,i} \right)^2 }
+$$
+
+$$
+y_{u,i} :the\ rating\ for\ movie\ i\ by\ user\ u\\ \hat{y}_{u,i}\ :the\ prediction \\N :the\ number of\ user/movie\ combinations 
+$$
+
 ## Exploratory analysis
 
 First, I would like to have a little glance of the edx dataset.
 
-```{r}
+```{r echo=FALSE}
 head(edx)
 ```
 
@@ -71,33 +81,15 @@ head(edx)
 range(edx$rating)
 ```
 
-In the dataset, "userId" indicates individual users. Some of them rate multiple movies. "movieid" corresponds each movie title. Rating range from 0.5 to 5.0 by 0.5. Each movie is categorized by "genres". But the genres has several words, for example, includes several words, "Action / Crime / Thriller".
-
 The edx dataset has six columns, and 9000055 rows.
 
-```{r}
+```{r echo=FALSE}
 dim(edx)
+```
+
+```{r echo=FALSE}
 names(edx)
 ```
-
-Regarding rating, its mean is approximately 3.5.
-
-```{r}
-#mean 
-mean(edx$rating)
-```
-
-Its distribution is shown below.
-
-```{r}
-edx %>%
-  ggplot(aes(rating)) + 
-  geom_bar() + 
-  ggtitle("ratings")
-
-```
-
-Considering movie reviews, there are two possibilities; a user rates multiple movies, also some movies get a lot of rates, and some only get a few. To find out, I plot both the number users and movies.
 
 ```{r echo=FALSE}
 #users
@@ -127,15 +119,86 @@ To find unique number, I use n_distinct().
 edx %>% summarize(n_users =n_distinct(userId), n_movies= n_distinct(movieId))
 ```
 
-69878 user have been participated in this data, and 10677 movies have been reviewed.
+69878 user have been participated in this data, and 10677 movies have been reviewed. check each column by plotting
+
+#### 1. users
+
+```{r echo=FALSE}
+edx %>% dplyr::count(userId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() + ggtitle("Users")
+```
+
+#### 2.Movies
+
+```{r echo=FALSE}
+edx %>% dplyr::count(movieId) %>% 
+  ggplot(aes(n)) + geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() + ggtitle("Movies")
+```
+
+#### 3.Ratings
+
+```{r echo=FALSE}
+edx %>% ggplot(aes(rating)) + geom_bar() + ggtitle("ratings")
+```
+
+#### 4. timestamp
+
+these figures need to be changed by lubridate and covert "timestamp" to POSIXct data, and find months of ratings.
+
+```{r echo=FALSE}
+edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01") 
+edx <- edx %>% mutate(date = round_date(timestamp, unit = "month"))
+```
+
+```{r echo=FALSE}
+edx %>% group_by(date) %>% 
+  summarize(ratings =mean(rating)) %>%
+  ggplot(aes(x = date, y=ratings)) +
+  geom_point() + geom_smooth(method = "lm")+ ggtitle("Months of rating")
+```
+
+#### 5. title
+
+at a glance, they seem not to have significance, but they have release year. to pick up the release years.
+
+```{r echo=FALSE}
+edx <- edx %>% 
+  mutate(release_year = as.numeric(str_sub(title,-5,-2))) 
+```
+
+```{r echo=FALSE}
+edx %>% group_by(release_year) %>% 
+  summarize(ratings = mean(rating)) %>% 
+  ggplot(aes(release_year, ratings)) + geom_point()+geom_smooth(method="lm")+      ggtitle("release_year")
+```
+
+compared to months of ratings, it seems to have significance in predicting rating. to reduce data size, I remove the columns, date and timestamp.
+
+edx \<- edx %\>% select(-timestamp, -date)
+
+\#\#\#\#6. genres How many genres does the dataset have?
+
+```{r echo=FALSE}
+edx$genres %>% n_distinct()
+```
+
+```{r echo=FALSE}
+edx %\>% group_by(genres)%\>% summarize(ratings = mean(rating))
+```
+
+```{r echo=FALSE}
+edx %>% group_by(genres) %>% 
+  summarize(n = n(), avg = mean(rating)) %>% 
+  filter(n >= 20000) %>% 
+  mutate(genres = reorder(genres,avg)) %>% 
+  ggplot(aes(x = genres, y = avg)) + geom_point() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ 
+  ggtitle("genres (n>20000)")
+```
 
 ## Model building and RMSE calculation
-
-$$
-\mbox{RMSE} = \sqrt{\frac{1}{N} \sum_{u,i}^{} \left( \hat{y}_{u,i} - y_{u,i} \right)^2 }
-$$
-
-
-
 
 ## Conclusion
