@@ -450,14 +450,14 @@ val_rmse <- sapply(lambdas, function(l){
 })
 
 #plot lambdas and rmses
-qplot(lambdas,val_rmses)
+qplot(lambdas,val_rmse)
 
 #find lambda and rmse which indicate the least value
-lambda <- lambdas[which.min(val_rmses)]
+lambda <- lambdas[which.min(val_rmse)]
 lambda
 #[1] 5
 
-min(val_rmses)
-#[1] 0.8646954
+min(val_rmse)
+#[1] 0.8646978
 
 ################################################################################

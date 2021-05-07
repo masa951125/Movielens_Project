@@ -10,17 +10,22 @@ output:
 
 ## Introduction
 
-Nowadays, recommendation systems have become common to us. Products and services are rated by consumers using stars and points, then accumulate into dataset. These ratings are precious; they are not only helpful for new customers to choose good or services, but also valuable for makers and service providers in terms of predicting future consumer behaviors. If you explore a user ratings in detail, you will find his/her preference, recommend things which are most likely to be bought.They enable a targeted marketing.
+Nowadays, recommendation systems have become common to us. Products and services are rated by consumers using stars and points, then the ratings accumulate into dataset. These ratings are considered to be precious; they are not only helpful for new customers to choose goods or services, but also valuable for makers and service providers in terms of predicting consumer behaviors. If you explore a user ratings in detail, you will find his/her preference, recommend things which are most likely to be bought.They enable a targeted marketing.
 
-In this paper, I will take a movie recommendation dataset, MovieLens, and build a model which will predict rating as accurately as possible.
+One of the field in which this system is used is movie industries. In this paper, I will take a movie recommendation dataset, and build a model which will predict rating as accurately as possible.
 
-#### 1 Dataset
+#### Dataset
 
 The data used in this report, MovieLens 10M Dataset, is available at the Grouplens website. The site says this data set has 10000054 ratings and 95580 tags applied to 10681 movies by 71567 users of the online movie recommender service MovieLens.
 
 MovieLens 10M dataset <https://grouplens.org/datasets/movielens/10m/>
 
 ```{r include=FALSE}
+library(tidyverse)
+library(caret)
+library(data.table)
+library(lubridate)
+
 dl <- tempfile()
 download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
@@ -51,7 +56,7 @@ edx <- rbind(edx, removed)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 ```
 
-#### 2 Goal
+#### Goal
 
 The goal is to train a machine learning algorithm to predict movie ratings based on factors in the provided dataset. To achieve this, the downloaded data is split into two, edx dataset (90%) and validation dataset (10%). The validation dataset is left to final evaluation.
 
@@ -60,14 +65,6 @@ As GroupLens web site explains, it has several factors, such as user ID, movie t
 Therefore, a linear regression will be used to find weights that minimize the residual mean squared error, the RMSE. Predictors are user ID, movie ID, genres. and released year. In addition to this, regulation is used to penalize large estimates that are produced using small sample sizes.
 
 RMSE is denoted as follows;
-
-$$
-\mbox{RMSE} = \sqrt{\frac{1}{N} \sum_{u,i}^{} \left( \hat{y}_{u,i} - y_{u,i} \right)^2 }
-$$
-
-$$
-y_{u,i} :the\ rating\ for\ movie\ i\ by\ user\ u\\ \hat{y}_{u,i}\ :the\ prediction \\N :the\ number of\ user/movie\ combinations 
-$$
 
 ## Exploratory analysis
 
@@ -177,16 +174,18 @@ edx %>% group_by(release_year) %>%
 
 compared to months of ratings, it seems to have significance in predicting rating. to reduce data size, I remove the columns, date and timestamp.
 
-edx \<- edx %\>% select(-timestamp, -date)
+```{r}
+edx <- edx %>% select(-timestamp, -date)
+```
 
-\#\#\#\#6. genres How many genres does the dataset have?
+#### 6. genres How many genres does the dataset have?
 
 ```{r echo=FALSE}
 edx$genres %>% n_distinct()
 ```
 
 ```{r echo=FALSE}
-edx %\>% group_by(genres)%\>% summarize(ratings = mean(rating))
+edx %>% group_by(genres)%>% summarize(ratings = mean(rating))
 ```
 
 ```{r echo=FALSE}
@@ -199,6 +198,364 @@ edx %>% group_by(genres) %>%
   ggtitle("genres (n>20000)")
 ```
 
-## Model building and RMSE calculation
+## Preparing Model building and RMSE calculation
+
+making test and training data
+
+```{r}
+set.seed(1, sample.kind = "Rounding")
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
+train_set <- edx[-test_index,]
+test_set <- edx[test_index,]
+```
+
+To make sure we don't include users and movies in the test set that do not appear in the training set, we remove these entries using the semi_join function
+
+```{r}
+test_set <- test_set %>%
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId")
+```
+
+RMSE function $$
+\mbox{RMSE} = \sqrt{\frac{1}{N} \sum_{u,i}^{} \left( \hat{y}_{u,i} - y_{u,i} \right)^2 }
+$$ $$
+y_{u,i} :the\ rating\ for\ movie\ i\ by\ user\ u\\ \hat{y}_{u,i}\ :the\ prediction \\N :the\ number of\ user/movie\ combinations 
+$$
+
+```{r}
+RMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+```
+
+## Model building
+
+#### 1 Naive model assuming the same rating for all movies
+
+```{r}
+mu <- mean(train_set$rating)
+naive_rmse <- RMSE(test_set$rating, mu)
+naive_rmse
+#[1] 1.060054
+```
+
+```{r include=FALSE}
+rmse_results <- tibble(method = "Rating Average", RMSE = naive_rmse)
+rmse_results
+```
+
+#### 2 movie effects
+
+```{r}
+mu <- mean(train_set$rating)
+
+movie_avg <- train_set %>%
+  group_by(movieId)%>%
+  summarize(b_i =mean(rating -mu))
+
+movie_effect_pred <- mu + test_set %>%
+  left_join(movie_avg, by="movieId") %>%
+  pull(b_i)
+
+movie_effect_rmse <- RMSE(test_set$rating, movie_effect_pred)
+movie_effect_rmse
+#[1] 0.9429615
+```
+
+```{r include=FALSE}
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Movie Effects Model",
+                                 RMSE =movie_effect_rmse))
+rmse_results
+```
+
+#### 3 movie and user effects
+
+```{r}
+user_avg <- train_set %>%
+  left_join(movie_avg, by= "movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = mean(rating- mu -b_i))
+
+movie_user_effect_pred <- test_set %>%
+  left_join(movie_avg, by="movieId") %>%
+  left_join(user_avg, by="userId") %>%
+  mutate(pred = mu + b_i + b_u)%>%
+  pull(pred)
+
+movie_user_effect_rmse <- RMSE(test_set$rating, movie_user_effect_pred)
+movie_user_effect_rmse
+#[1] 0.8646844  
+```
+
+```{r include=FALSE}
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Movie User Effects Model",
+                                 RMSE =movie_user_effect_rmse))
+rmse_results
+```
+
+#### 4 genre effects
+
+```{r}
+g_avg <- train_set %>%
+  left_join(movie_avg, by= "movieId")%>%
+  left_join(user_avg, by="userId") %>%
+  group_by(genres) %>%
+  summarize(g = mean(rating- mu -b_i -b_u))
+
+movie_user_genre_effect_pred <- test_set %>%
+  left_join(movie_avg, by="movieId") %>%
+  left_join(user_avg, by="userId") %>%
+  left_join(g_avg, by="genres") %>%
+  mutate(pred = mu + b_i + b_u + g)%>%
+  pull(pred)
+
+movie_user_genre_effect_rmse <- RMSE(test_set$rating, 
+                                     movie_user_genre_effect_pred)
+movie_user_genre_effect_rmse
+#[1] 0.8643242
+```
+
+```{r include=FALSE}
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Movie User Genre Effects Model",
+                                 RMSE =movie_user_genre_effect_rmse))
+rmse_results
+```
+
+#### 5 release year effects
+
+```{r}
+y_avg <- train_set %>%
+  left_join(movie_avg, by= "movieId")%>%
+  left_join(user_avg, by="userId") %>%
+  left_join(g_avg, by="genres") %>%
+  group_by(release_year) %>%
+  summarize(y = mean(rating- mu -b_i -b_u -g))
+
+movie_user_genre_year_effect_pred <- test_set %>%
+  left_join(movie_avg, by="movieId") %>%
+  left_join(user_avg, by="userId") %>%
+  left_join(g_avg, by="genres") %>%
+  left_join(y_avg, by="release_year")%>%
+  mutate(pred = mu + b_i + b_u + g +y)%>%
+  pull(pred)
+
+movie_user_genre_year_effect_rmse <- RMSE(test_set$rating,
+                                          movie_user_genre_year_effect_pred)
+movie_user_genre_year_effect_rmse
+#[1] 0.8641262
+```
+
+```{r include=FALSE}
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method=
+                                   "Movie User Genre Release Year Effects Model",
+                                 RMSE =movie_user_genre_year_effect_rmse))
+rmse_results
+```
+
+#### 6 regularization (movie, user)
+
+introducing lambda
+
+```{r}
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+
+  mu <- mean(train_set$rating)
+
+  reg_movie_avg <- train_set %>%
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+
+  reg_user_avg <- train_set %>%
+    left_join(reg_movie_avg, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+
+  predicted_ratings <- test_set %>%
+    left_join(reg_movie_avg, by = "movieId") %>%
+    left_join(reg_user_avg ,by = "userId") %>%
+    mutate(pred = mu + b_i + b_u) %>%
+    pull(pred)
+
+  return(RMSE(predicted_ratings, test_set$rating))
+
+})
+```
+
+```{r}
+qplot(lambdas,rmses)
+
+lambda <- lambdas[which.min(rmses)]
+lambda
+#[1] 5
+
+```
+
+```{r}
+reg_movie_user_rmse <- rmses
+reg_movie_user_rmse[5]
+#[1] 0.8644477
+```
+
+```{r include=FALSE}
+rmse_results <- bind_rows(rmse_results,
+                          tibble(method="Reg Movie User Effects Model",
+                                 RMSE =reg_movie_user_rmse[5]))
+rmse_results
+```
+
+#### 7 regularization (movie, user,genres, release_year)
+
+calculating lambda
+
+```{r}
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+
+  mu <- mean(train_set$rating)
+
+  reg_movie_avg <- train_set %>%
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+
+  reg_user_avg <- train_set %>%
+    left_join(reg_movie_avg, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+
+  g_avg <- train_set %>%
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
+    group_by(genres) %>%
+    summarize(g = sum(rating - b_i -b_u - mu)/(n()+l))  
+
+    y_avg <- train_set %>% 
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
+    left_join(g_avg, by="genres") %>%
+    group_by(release_year) %>%
+    summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+l)) 
+
+  predicted_ratings <-test_set %>%
+    left_join(reg_movie_avg, by = "movieId") %>%
+    left_join(reg_user_avg, by = "userId") %>%
+    left_join(g_avg, by="genres") %>%
+    left_join(y_avg, by="release_year")%>%
+    mutate(pred = mu + b_i + b_u + g + y) %>%
+    pull(pred)
+
+  return(RMSE(predicted_ratings, test_set$rating))
+})
+```
+
+```{r}
+qplot(lambdas,rmses)
+lambda <- lambdas[which.min(rmses)]
+lambda
+#[1] 4.5
+
+min(rmses)
+#[1] 0.8636478
+```
+
+#### 8 model summary
+
+```{r}
+rmse_results <- bind_rows(rmse_results, 
+                          tibble(method=
+                                "Reg Movie User Genre Release Year Effects Model",
+                                MSE =rmses[4.5]))%>% as.data.frame()
+```
+
+| method                                          |      RMSE |
+|:------------------------------------------------|----------:|
+| Rating Average                                  | 1.0600537 |
+| Movie Effects Model                             | 0.9429615 |
+| Movie User Effects Model                        | 0.8646844 |
+| Movie User Genre Effects Model                  | 0.8643242 |
+| Movie User Genre Release Year Effects Model     | 0.8641262 |
+| Reg Movie User Effects Model                    | 0.8644477 |
+| Reg Movie User Genre Release Year Effects Model | 0.8639532 |
+
+final model "Reg Movie User Genre Release Year Effects Model" is proved to extract the least RMSE Value.
+
+## Evaluation
+
+validation calculating lambda add and cut columns in the process of training
+
+```{r}
+validation <- validation %>% mutate(release_year = 
+                                      as.numeric(str_sub(title,-5,-2)))
+validation <- validation %>% select(-timestamp)
+```
+
+define lambdas as a variable
+
+```{r}
+lambdas <- seq(0, 10, 0.25)
+
+#calculate rmse using "Reg Movie User Genre Release Year Effects Model" 
+
+val_rmse <- sapply(lambdas, function(l){
+
+  mu <- mean(train_set$rating)
+
+  reg_movie_avg <- train_set %>%
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+
+  reg_user_avg <- train_set %>%
+    left_join(reg_movie_avg, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+
+  g_avg <- train_set %>%
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
+    group_by(genres) %>%
+    summarize(g = sum(rating - b_i -b_u - mu)/(n()+l))  
+
+  y_avg <- train_set %>%
+    left_join(reg_movie_avg, by="movieId") %>%
+    left_join(reg_user_avg, by="userId") %>%
+    left_join(g_avg, by="genres") %>%
+    group_by(release_year) %>%
+    summarize(y = sum(rating - b_i -b_u -g - mu)/(n()+l)) 
+
+  val_pred <-validation %>%
+    left_join(reg_movie_avg, by = "movieId") %>%
+    left_join(reg_user_avg, by = "userId") %>%
+    left_join(g_avg, by="genres") %>%
+    left_join(y_avg, by="release_year")%>%
+    mutate(pred = mu + b_i + b_u + g + y) %>%
+    pull(pred)
+
+    #replace NA with mu(the average rating in the training)
+    val_pred <-replace(val_pred, is.na(val_pred),mu)
+
+    return(RMSE(val_pred,validation$rating))
+})
+```
+
+plot lambdas and rmses
+
+```{r}
+qplot(lambdas,val_rmse)
+
+#find lambda and rmse which indicate the least value
+lambda <- lambdas[which.min(val_rmse)]
+lambda
+#[1] 5
+
+min(val_rmse)
+#[1] 0.8646954
+```
 
 ## Conclusion
