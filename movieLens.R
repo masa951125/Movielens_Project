@@ -42,10 +42,17 @@ edx <- rbind(edx, removed)
 
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 ################################################################################
-#Find basic information about the dataset.
+#Find basic information about the dataset, edx and validation
 
-#overall info
+#check the numbers of rows and columns of these datasets.
+dim(edx)
+#[1] 9000055       6
+dim(validation)
+#[1] 999999      6
 
+#edx's columns(predictors)
+
+#the first rows of edx
 head(edx)
 # userId movieId rating timestamp                         title
 # 1:      1     122      5 838985046              Boomerang (1992)
@@ -63,34 +70,28 @@ head(edx)
 # 5: Action|Adventure|Drama|Sci-Fi
 # 6:       Children|Comedy|Fantasy
 
-str(edx)
-#Classes ‘data.table’ and 'data.frame':	9000055 obs. of  6 variables:
-# $ userId   : int  1 1 1 1 1 1 1 1 1 1 ...
-# $ movieId  : num  122 185 292 316 329 355 356 362 364 370 ...
-# $ rating   : num  5 5 5 5 5 5 5 5 5 5 ...
-# $ timestamp: int  838985046 838983525 838983421 838983392 838983392 838984474 838983653 838984885 838983707 838984596 ...
-# $ title    : chr  "Boomerang (1992)" "Net, The (1995)" "Outbreak (1995)" "Stargate (1994)" ...
-#$ genres    : chr  "Comedy|Romance" "Action|Crime|Thriller" "Action|Drama|Sci-Fi|Thriller" "Action|Adventure|Sci-Fi" ...
-# - attr(*, ".internal.selfref")=<externalptr> 
-
-summary(edx)
-# userId         movieId          rating        timestamp        
-# Min.   :    1   Min.   :    1   Min.   :0.500   Min.   :7.897e+08  
-# 1st Qu.:18124   1st Qu.:  648   1st Qu.:3.000   1st Qu.:9.468e+08  
-# Median :35738   Median : 1834   Median :4.000   Median :1.035e+09  
-# Mean   :35870   Mean   : 4122   Mean   :3.512   Mean   :1.033e+09  
-# 3rd Qu.:53607   3rd Qu.: 3626   3rd Qu.:4.000   3rd Qu.:1.127e+09  
-# Max.   :71567   Max.   :65133   Max.   :5.000   Max.   :1.231e+09  
-
-# title              genres         
-# Length:9000055     Length:9000055    
-# Class :character   Class :character  
-# Mode  :character   Mode  :character 
-
+################################################################################
 #check each column by plotting 
 
-#1 users
+#"rating"
 
+#find out its range
+unique(edx$rating)%>% sort() 
+# [1] 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0
+
+#plot its distribution
+edx %>%
+  ggplot(aes(rating)) + 
+  geom_bar() + 
+  ggtitle("Ratings")
+
+#"useId"
+
+#find unique number of users
+n_distinct(edx$userId)
+#[1] 69878
+
+#plot histogram of userID
 edx %>%
   dplyr::count(userId) %>% 
   ggplot(aes(n)) + 
@@ -98,56 +99,58 @@ edx %>%
   scale_x_log10() +
   ggtitle("Users")
 
-#2 movies
+#"movieId"
 
+#find unique number of movies
+n_distinct(edx$movieId)
+
+#plot histogram of movieId
 edx %>% 
   dplyr::count(movieId) %>% 
   ggplot(aes(n)) + 
   geom_histogram(bins = 30, color = "black") + 
   scale_x_log10() + 
   ggtitle("Movies")
+#[1] 10677
 
-#3 ratings
+#"timestamp"
 
-edx %>%
-  ggplot(aes(rating)) + 
-  geom_bar() + 
-  ggtitle("ratings")
+#covert "timestamp" to POSIXct data
+edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01", tz="GMT")
 
-#4 timestamp
- #these figures need to be changed by lubridate
- #covert "timestamp" to POSIXct data, and find months of ratings.
-
-edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01")
+#and find months of ratings.It is named "date"
 edx <- edx %>% mutate(date = round_date(timestamp, unit = "month"))  
+
+#plot date and rating
 edx%>%
   group_by(date) %>%
   summarize(ratings =mean(rating)) %>% 
   ggplot(aes(x = date, y=ratings)) +geom_point() + geom_smooth(method = "lm")
   ggtitle("Months of rating")
   
-#5 title
- #at a glance, they seem not to have significance, but they have release year.
- #try to pick up the release years.
+#"title"
 
+#extract the release years from the title. It is named "release year"
 edx <- edx %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
+
+#plot release year and rating
 edx %>% group_by(release_year) %>%
   summarize(ratings = mean(rating)) %>% 
   ggplot(aes(release_year, ratings)) +
   geom_point()+geom_smooth(method="lm")+
-  ggtitle("release_year")
+  ggtitle("Release_year")
 
-#compared to months of ratings, it seems to have significance in predicting rating.
-#to reduce data size, I remove the columns, date and timestamp.
-edx <- edx %>% select(-timestamp, -date)
+#"genres"
 
-#6 genres
-
+#find the number of unique genres
 edx$genres %>% n_distinct()
 
+#top 10 genres in terms of rating
 edx %>% group_by(genres)%>%
-  summarize(ratings = mean(rating))
+  summarize(ratings = mean(rating))%>%top_n(10)
 
+#plot genres and rating. 
+#using genres which have more than 20000 ratings.
 edx %>% group_by(genres) %>%
   summarize(n = n(), avg = mean(rating)) %>%
   filter(n >= 20000) %>% 
@@ -155,19 +158,19 @@ edx %>% group_by(genres) %>%
   ggplot(aes(x = genres, y = avg)) + 
   geom_point() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  ggtitle("genres (n>20000)")
+  ggtitle("Genres (n>20000)")
 
 ################################################################################
-#making test and training data
+#making test and training data 10% train_set, 90% test_set
 
 set.seed(1, sample.kind = "Rounding") 
 test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
 train_set <- edx[-test_index,]
 test_set <- edx[test_index,]
 
- #To make sure we don’t include users and movies in the test set 
- #that do not appear in the training set, 
- #we remove these entries using the semi_join function:
+#To make sure we don’t include users and movies in the test set 
+#that do not appear in the training set, 
+#we remove these entries using the semi_join function:
 
 test_set <- test_set %>% 
   semi_join(train_set, by = "movieId") %>%
@@ -177,7 +180,6 @@ test_set <- test_set %>%
 RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
-
 ################################################################################
 #1 Naive model assuming the same rating for all movies.
 
