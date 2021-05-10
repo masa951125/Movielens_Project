@@ -206,7 +206,7 @@ From these studies, we found that "movieId", "userId", "genres", and "release ye
 
 In order to make models, we split the edx dataset into training set and test set.
 
-```{r echo=TRUE}
+```{r include=FALSE}
 set.seed(1, sample.kind = "Rounding")
 test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
 train_set <- edx[-test_index,]
@@ -215,7 +215,7 @@ test_set <- edx[test_index,]
 
 To make sure we don't include users and movies in the test set that do not appear in the training set, we remove these entries using the semi_join function.
 
-```{r echo=TRUE}
+```{r include=FALSE}
 test_set <- test_set %>%
   semi_join(train_set, by = "movieId") %>%
   semi_join(train_set, by = "userId")
@@ -235,7 +235,7 @@ RMSE <- function(true_ratings, predicted_ratings){
 
 The model which minimize the RMSE in the test set will be applied to the validation dataset, and extract its RMSE.
 
-## Model Building
+## Finding Models
 
 ### 1 Baseline model, assuming the same rating for all movies
 
@@ -420,20 +420,20 @@ rmses <- sapply(lambdas, function(l){
 })
 ```
 
-Then we plot $\lambda$ and rmses.
+Then we plot $\lambda$ and RMSEs that the code produced..
 
 ```{r echo=FALSE}
 qplot(lambdas,rmses)
 ```
 
-The value of $\lambda$ which minimize rmses is
+The value of $\lambda$ which minimize the RMSEs is
 
 ```{r echo=FALSE}
 lambda <- lambdas[which.min(rmses)]
 lambda
 ```
 
-The minimized value of rmses is
+The minimized value of the RMSE is
 
 ```{r echo=FALSE}
 reg_movie_user_rmse <- rmses
@@ -495,7 +495,7 @@ rmses <- sapply(lambdas, function(l){
 })
 ```
 
-The value of $\lambda$ which minimize the RMSE is ;
+The value of $\lambda$ which minimize the RMSEs is ;
 
 ```{r echo=FALSE}
 lambda <- lambdas[which.min(rmses)]
@@ -516,9 +516,9 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 ```
 
-Final model "Reg Movie User Genre Release Year Effects Model" is proved to extract the least RMSE Value in the test set.
+From this table, the final model "Reg Movie User Genre Release Year Effects Model" is proved to extract the least RMSE Value in the test set.
 
-## Evaluation
+## Final Evaluation
 
 Before the final evaluation, the validation set needs to be arranged to fit the train set. The Release Year column should be added from title column.
 
@@ -575,7 +575,7 @@ val_rmse <- sapply(lambdas, function(l){
 })
 ```
 
-Then we find lambda which minimize the RMSE.
+Then we find lambda which minimize the RMSEs.
 
 ```{r echo=FALSE}
 lambda <- lambdas[which.min(val_rmse)]
@@ -593,8 +593,8 @@ We found out that the last model in which a regularized linear regression with p
 
 ## Conclusion
 
-In this report, we made 6 models. The basic method is a linear regression. In the test set, the simple regression model "Movie User Genre Release Year Effects Model" showed improvement by 18.483% compared to the first baseline model ( only the average rating is considered).
+In this report, we made 6 models. Our method is a linear regression. In the test set, the simple regression model "Movie User Genre Release Year Effects Model" showed improvement by 18.483% compared to the first baseline model ( only the average rating is considered) in terms of the RMSE.
 
-Regularization has prove to be effective. However, if you take only two factors, our exploration showed that it was less effective than the 4th model. But the regularized model was improved once it took factors, genres and release year into the regularized model. The "Reg Movie User Genre Release Year Effects Model" proved to the best in the test set. Compared to the first model, it illustrated 18.499% improvement. Our final RMSE result from the validation set is 0.86469.
+Regularization has prove to be effective. However, if you take only two factors (movie and user), our exploration showed that it was less effective than the 4th model. The regularized model was improved once it took more factors, genres and release year into the regularized model. The "Reg Movie User Genre Release Year Effects Model" proved to the best in the test set. Compared to the first model, it illustrated 18.499% improvement. Our final RMSE result from the validation set is 0.86469.
 
-Having said that, this exploration revealed its limitation. As we increase predictors, the improvement becomes more and more small. The difference between 4th model and 6th model in terms of the RMSE is approximately 0.00017. To improve the result, it is necessary to consider other factors like correlations between genres and introduce other method such as matrix factorization.
+Having said that, this exploration revealed its limitation. As we increase predictors, the improvement becomes more and more slight. The difference between 4th model and 6th model in terms of the RMSE is approximately 0.00017. To improve the result, it is necessary to consider other factors like correlations between genres and introduce other method such as matrix factorization.

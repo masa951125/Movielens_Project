@@ -28,7 +28,8 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),title =
 movielens <- left_join(ratings, movies, by = "movieId")
 
 # Validation set will be 10% of MovieLens data
-set.seed(1, sample.kind="Rounding") 
+# set.seed(1) # if using R 3.5 or earlier
+set.seed(1, sample.kind = "Rounding") # if using R 3.6 or later
 test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
 edx <- movielens[-test_index,]
 temp <- movielens[test_index,]
@@ -146,8 +147,8 @@ edx %>% group_by(genres) %>%
 #Exploration Summary#
 
 #making test and training data 10% train_set, 90% test_set
-
-set.seed(1, sample.kind = "Rounding") 
+# set.seed(1) # if using R 3.5 or earlier
+set.seed(1, sample.kind = "Rounding") # if using R 3.6 or later
 test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
 train_set <- edx[-test_index,]
 test_set <- edx[test_index,]
@@ -166,7 +167,7 @@ RMSE <- function(true_ratings, predicted_ratings){
 }
 
 ################################################################################
-#Model Building#
+#Finding Models#
 #1 Baseline model, assuming the same rating for all movies#
 
 #produce rmse
@@ -369,7 +370,7 @@ rmse_results %>% knitr::kable()
 # final model "Reg Movie User Genre Release Year Effects Model" 
 
 ################################################################################
-#Evaluation#
+#Final Evaluation#
 
 #add a column  to the validation set
 #it is produced in the process of finding models
