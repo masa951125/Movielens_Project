@@ -10,27 +10,27 @@ output:
 
 ## Introduction
 
-Nowadays, recommendation systems have become common to us. Many products and services are rated by consumers using stars and points, and these ratings are utilized by companies and organizations. They are precious; they are not only helpful for customers to choose goods or services, but are also valuable for makers and service providers in terms of predicting consumer behaviors. If you explore user ratings in detail, you will find their customers preference, and be able to recommend things which may be most likely to be bought or used.
+Nowadays, recommendation systems have become common to us. Many products and services are rated by consumers using stars and points, and these ratings are utilized by companies and organizations. They are precious; they are not only helpful for customers to choose goods or services, but are also valuable for makers and service providers in terms of predicting consumers behavior. If you explore user ratings in detail, you will find their customers preference, and be able to recommend things which are most likely to be bought or used.
 
-One of the field in which this system is used is movie industries. In this paper, I will take a movie recommendation dataset, and build a model which will predict rating using factors as accurately as possible.
+One of the field in which this system is used is movie industries. In this paper, I will take a movie recommendation dataset, explore its content, and build a model which will predict ratings as accurately as possible.
 
-### Dataset
+### 1.Dataset
 
 The data used in this report, MovieLens 10M Dataset, is available at the Grouplens website. According to the site, this data set has 10000054 ratings and 95580 tags applied to 10681 movies by 71567 users of the online movie recommender service MovieLens.
 
-MovieLens 10M dataset <https://grouplens.org/datasets/movielens/10m/>
+MovieLens 10M dataset: <https://grouplens.org/datasets/movielens/10m/>
 
-### Goal
+### 2.Goal
 
 The goal is to train a machine learning algorithm to predict movie ratings based on factors in the provided dataset.
 
-As GroupLens web site says, it has several factors, such as user ID, movie title, genres, rating as well. The assumption in this paper is that they are inter-correlated to some extent and helpful to forecast ratings. The challenge of a recommendation system, however, is that the data is sparse and each factor in the dataset might affect others. Namely, some users rate movies more than others, and some movies are rated more. Genres, released year may also affect ratings.
+According to the GroupLens web site, it has several factors, such as user ID, movieID, title, genres, rating as well. The assumption in this paper is that they are inter-correlated and helpful to forecast ratings. The challenge of a recommendation system, however, is that the data is sparse and each factor in the dataset might affect others. Namely, some users rate movies far more than others, and some movies are rated more. Contrarily, some movies are rated by very small number of users. Moreover, genres, released year may also affect ratings.
 
 Therefore, a linear regression will be used to find weights that minimize the residual mean squared error, the RMSE. Predictors are user ID, movie ID, genres. and released year. In addition to this, regulation is used to penalize large estimates that are produced by using small samples.
 
 ## Exploratory Analysis
 
-The downloaded data is split into two, edx dataset (90%) and validation dataset (10%).
+The downloaded data is split into two, the edx dataset (90%) and the validation dataset (10%).
 
 ```{r include=FALSE}
 library(tidyverse)
@@ -68,7 +68,7 @@ edx <- rbind(edx, removed)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 ```
 
-The validation dataset has 999999 rows and 6 columns. And the edx dataset has 9000055 rows and 6 columns.The validation dataset is left to final evaluation of a model explored in this paper.
+The validation dataset has 999999 rows and 6 columns. And the edx dataset has 9000055 rows and 6 columns. The validation dataset is left to final evaluation by a model explored in this paper.
 
 ```{r eval=FALSE, include=FALSE}
 dim(edx)
@@ -81,11 +81,11 @@ The first six rows of the edx dataset is as follows;
 head(edx)
 ```
 
-UserId indicates a person who rate movies (rating). Users rate multiple movies. Each movie corresponds to movieId and title. Title has a movie's release year in a parenthesis. Movies are categorized by genres, which consists of several words, such as "Comedy", "Crime", or "Sci-Fi". They are separated by "\|".
+UserId indicates a person who rate movies. Users rate multiple movies. Each movie corresponds to movieId and title. Title has a movie's release year in a parenthesis. Movies are categorized by genres, which consists of several words, such as "Comedy", "Crime", or "Sci-Fi". They are separated by "\|".
 
 We will investigate columns to find out their features.
 
-### Rating
+### 1.Rating
 
 Ratings ranges from 0.5 to 5.0 by 0.5. 5.0 is the highest. The distribution is right-skewed. The mean of the rating is 3.51. The median is 4.
 
@@ -99,9 +99,9 @@ mean(edx$rating)
 median(edx$rating)
 ```
 
-### Users
+### 2.Users
 
-The number of user (unique user) is 69878. As is seen in the first six rows of the edx, users rate multiple movies. It's distribution is left-skewed. Some users are very active in rating movies. We clearly see that there is a user effect which affect ratings.
+The number of user (unique user) is 69878. As is seen in the first six rows of the edx, some users rate multiple movies. It's distribution is left-skewed. Some are very active in rating movies (more than 1,000).
 
 ```{r echo=FALSE}
 edx %>%
@@ -117,9 +117,9 @@ edx %>%
 n_distinct(edx$userId)
 ```
 
-### Movies
+### 3.Movies
 
-10677 movies (the number of unique movies) are rated. They are rated by multiple users. The histogram tells us some movies get very small amount of ratings and some get huge amount of ratings. It surely leads to producing effects.
+10677 movies (the number of unique movies) are rated. They are rated by multiple users. The histogram tells us some movies get very small amount of ratings (less than 10) and some get huge amount of ratings (more than 10,000).
 
 ```{r echo=FALSE}
 edx %>% dplyr::count(movieId) %>% 
@@ -129,24 +129,23 @@ edx %>% dplyr::count(movieId) %>%
 
 ```{r eval=FALSE, include=FALSE}
 n_distinct(edx$movieId)
-
 ```
 
-### Timestamp
+### 4.Timestamp
 
-The class of "timestamp" is an integer. They are the exact date of rating, produced by counting days from the day, "1970.01.01". To deal with them, these figures need to covert to POSIXct data.
+The class of "timestamp" is an integer. The numbers are produced by counting days from the day, "1970.01.01". To make them more understandable, we will covert them to POSIXct data at first.
 
 ```{r include=FALSE}
 edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01",tz="GMT") 
 ```
 
-To find out the correlation between the date of rate and rating, we create a new column "date". The column have a month and year of the date when being rated.
+Then we mutate a new column "date". The column have a month and year of the date when a movie being rated.
 
 ```{r include=FALSE}
 edx <- edx %>% mutate(date = round_date(timestamp, unit = "month"))
 ```
 
-We plot rating and date showing a regression line. Points are mainly gathered around 3.5 rating, and the regression line is relatively flat. We leave out the rate dates since they seem not to have much significance.
+We plot rating and date with a regression line. As is seen from the graph, points are mainly gathered around 3.5 rating, and the regression line is relatively flat.
 
 ```{r echo=FALSE}
 edx %>% group_by(date) %>% 
@@ -155,9 +154,9 @@ edx %>% group_by(date) %>%
   geom_point() + geom_smooth(method = "lm")+ ggtitle("Months of rating")
 ```
 
-### Title
+### 5.Title
 
-Titles are difficult to deal with as they are. But they have release years in parentheses. We extract years from titles. Then, we mutate new columns,"release year". We plot rating and release year along showing a regression line. There seems to be a tendency that recent movies are rated low and old movies are rated high. The release year works as effects to predict rating.
+Titles are difficult to deal with as they are. But they have release years in parentheses. We extract years from titles. Then we mutate new columns, "release year". We plot rating and release year with a regression line. There seems to be a tendency that recent movies are rated low and old movies are rated high. The release year works as effects to predict rating.
 
 ```{r include=FALSE}
 edx <- edx %>% 
@@ -171,7 +170,7 @@ edx %>% group_by(release_year) %>%
   ggtitle(" Release_year")
 ```
 
-### Genres
+### 6.Genres
 
 Some like comedy, but do not like thriller. Some like Sci-fi but do not like animation. Such a preference naturally affects movies' rating.
 
@@ -200,9 +199,9 @@ edx %>% group_by(genres) %>%
   ggtitle("genres (n>20000)")
 ```
 
-### Exploration Summary
+### 7.Exploration Summary
 
-From these studies, we found that "movieId", "userId", "genres", and "release year (extracted from "title") are important factors deciding rating.
+From these studies, we found that "movieId", "userId", "genres", and "release year (extracted from "title") are important factors deciding rating. We leave out the rating dates since they seem not to have much significance. Using these factors, we will make a linear regression model in the next chapter.
 
 In order to make models, we split the edx dataset into training set and test set.
 
@@ -247,10 +246,10 @@ naive_rmse <- RMSE(test_set$rating, mu)
 naive_rmse
 ```
 
-This is a baseline of our further modeling.
+This is a baseline of our further modeling. We name it "Average rating".
 
 ```{r echo=FALSE}
-rmse_results <- tibble(method = "1. Average rating", RMSE = naive_rmse)
+rmse_results <- tibble(method = "1. Average Rating Model", RMSE = naive_rmse)
 rmse_results %>% knitr::kable()
 ```
 
@@ -277,11 +276,11 @@ movie_effect_rmse <- RMSE(test_set$rating, movie_effect_pred)
 movie_effect_rmse
 ```
 
-The RMSE is improved.
+The RMSE is improved. We call it "Movie Effect Model".
 
 ```{r echo=FALSE}
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="2 Movie Effects Model",
+                          tibble(method="2. Movie Effects Model",
                                  RMSE =movie_effect_rmse))
 rmse_results %>% knitr::kable()
 ```
@@ -312,17 +311,19 @@ movie_user_effect_rmse <- RMSE(test_set$rating, movie_user_effect_pred)
 movie_user_effect_rmse
 ```
 
+We call it "Movie User Effect Model".
+
 ```{r echo=FALSE}
 
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="3 Movie User Effects Model",
+                          tibble(method="3. Movie User Effects Model",
                                  RMSE =movie_user_effect_rmse))
 rmse_results%>% knitr::kable()
 ```
 
 ### 4 Genres and release year effects
 
-In our exploration, we found that genres and release year also seem to affect the prediction. Does considering these two factors improve the RMSE? We assume genre effect and release year effect. This can be represented as a following linear regression model. $g_{u,i}$ is genre effect, and $yr_{u,i}$ is year effect.
+In our exploration, we found that genres and release year also seem to affect the prediction. Does considering these two factors improve the RMSE? We assume genres effect and release year effect. This can be represented as a following linear regression model. $g_{u,i}$ is genres effect, and $yr_{u,i}$ is release year effect.
 
 $$
 Y_{u, i} = \mu + b_i + b_u + \epsilon_{u, i} +g_{u, i} +yr_{u, i}
@@ -356,12 +357,12 @@ movie_user_genre_year_effect_rmse <- RMSE(test_set$rating,
 movie_user_genre_year_effect_rmse
 ```
 
-It has been much improved.
+It has been much improved. We name it "Movie User Genre Release Year Effect Model".
 
 ```{r echo=FALSE}
 rmse_results <- bind_rows(rmse_results,
                           tibble(method=
-                                   "4 Movie User Genre Release Year Effects Model",
+                                  "4. Movie User Genre Release Year Effects Model",
                                  RMSE =movie_user_genre_year_effect_rmse))
 rmse_results %>% knitr::kable()
 ```
@@ -441,9 +442,11 @@ reg_movie_user_rmse[5]
 #[1] 0.8644477
 ```
 
+We name it "Reg Movie User Effects Model".
+
 ```{r echo=FALSE}
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="5 Reg Movie User Effects Model",  
+                          tibble(method="5. Reg Movie User Effects Model",  
                                  RMSE =reg_movie_user_rmse[5]))
 rmse_results %>% knitr::kable()
 ```
@@ -495,23 +498,25 @@ rmses <- sapply(lambdas, function(l){
 })
 ```
 
-The value of $\lambda$ which minimize the RMSEs is ;
+The value of $\lambda$ which minimize the RMSEs is
 
 ```{r echo=FALSE}
 lambda <- lambdas[which.min(rmses)]
 lambda
 ```
 
-The RMSE is;
+The RMSE is
 
 ```{r echo=FALSE}
 min(rmses)
 ```
 
+We call it "Reg Movie User Genre Release Year Effects Model".
+
 ```{r echo=FALSE}
 rmse_results <- bind_rows(rmse_results, 
                           tibble(method=
-                               "6 Reg Movie User Genre Release Year Effects Model",
+                              "6. Reg Movie User Genre Release Year Effects Model",
                                 RMSE =rmses[4.5]))
 rmse_results %>% knitr::kable()
 ```
@@ -589,12 +594,12 @@ Final_RMSE <-min(val_rmse)
 Final_RMSE 
 ```
 
-We found out that the last model in which a regularized linear regression with predictors (userId, movieId, genres, and release year) produces the least value of the RMSE. **The value is 0.8646978**
+The model, "Reg Movie User Genre Release Year Effects Model" in which a regularized linear regression with predictors (userId, movieId, genres, and release year) produces the RMSE 0.8646978.
 
 ## Conclusion
 
-In this report, we made 6 models. Our method is a linear regression. In the test set, the simple regression model "Movie User Genre Release Year Effects Model" showed improvement by 18.483% compared to the first baseline model ( only the average rating is considered) in terms of the RMSE.
+In this report, we made six models. Our method was a linear regression. In the test set, the simple regression model "Movie User Genre Release Year Effects Model" showed improvement by 18.483% compared to the first baseline model ( only the average rating is considered) in terms of the RMSE.
 
-Regularization has prove to be effective. However, if you take only two factors (movie and user), our exploration showed that it was less effective than the 4th model. The regularized model was improved once it took more factors, genres and release year into the regularized model. The "Reg Movie User Genre Release Year Effects Model" proved to the best in the test set. Compared to the first model, it illustrated 18.499% improvement. Our final RMSE result from the validation set is 0.86469.
+Regularization has prove to be effective. However, if you take only two predictors (movie and user), our exploration showed that it was less effective than the 4th model. The regularized model was improved once it took more factors, genres and release year into the regularized model. The "Reg Movie User Genre Release Year Effects Model" proved to the best in the test set. Compared to the first model, it illustrated 18.499% improvement. Our final RMSE result from the validation set is 0.86469.
 
-Having said that, this exploration revealed its limitation. As we increase predictors, the improvement becomes more and more slight. The difference between 4th model and 6th model in terms of the RMSE is approximately 0.00017. To improve the result, it is necessary to consider other factors like correlations between genres and introduce other method such as matrix factorization.
+Having said that, this exploration revealed its limitation. As we increased predictors, the improvement became more and more slight. The difference between 4th model and 6th model in terms of the RMSE was approximately 0.00017. To improve the result, it is necessary to consider other factors like correlations between genres and introduce other method such as matrix factorization.

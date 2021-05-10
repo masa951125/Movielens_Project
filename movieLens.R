@@ -176,7 +176,7 @@ naive_rmse <- RMSE(test_set$rating, mu)
 naive_rmse
 
 #make a table
-rmse_results <- tibble(method = "1 Average rating", RMSE = naive_rmse)
+rmse_results <- tibble(method = "1. Average Rating Model", RMSE = naive_rmse)
 rmse_results %>% knitr::kable()
 
 ################################################################################
@@ -197,7 +197,7 @@ movie_effect_rmse
 
 #make a table
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="2 Movie Effects Model",  
+                          tibble(method="2. Movie Effects Model",  
                                      RMSE =movie_effect_rmse))
 rmse_results %>% knitr::kable()
 
@@ -221,7 +221,7 @@ movie_user_effect_rmse <- RMSE(test_set$rating, movie_user_effect_pred)
 movie_user_effect_rmse
 
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="3 Movie User Effects Model",  
+                          tibble(method="3. Movie User Effects Model",  
                                  RMSE =movie_user_effect_rmse))
 rmse_results %>% knitr::kable()
 
@@ -255,7 +255,7 @@ movie_user_genre_year_effect_rmse
 
 #make a table
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="4 Movie User Genre Release Year Effects Model",  
+                          tibble(method="4. Movie User Genre Release Year Effects Model",  
                                  RMSE =movie_user_genre_year_effect_rmse))
 rmse_results %>% knitr::kable()
 
@@ -302,7 +302,7 @@ reg_movie_user_rmse[5]
 
 #make a table
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="5 Reg Movie User Effects Model",  
+                          tibble(method="5. Reg Movie User Effects Model",  
                                  RMSE =reg_movie_user_rmse[5]))
 rmse_results %>% knitr::kable()
 
@@ -362,7 +362,7 @@ min(rmses)
 
 #model summary
 rmse_results <- bind_rows(rmse_results,
-                          tibble(method="6 Reg Movie User Genre Release Year Effects Model",  
+                          tibble(method="6. Reg Movie User Genre Release Year Effects Model",  
                                  RMSE =rmses[4.5]))%>% as.data.frame()
 rmse_results
 rmse_results %>% knitr::kable()
