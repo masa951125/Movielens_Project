@@ -1,4 +1,5 @@
-#used following libraries
+#using following libraries
+
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
@@ -262,7 +263,7 @@ rmse_results %>% knitr::kable()
 ################################################################################
 #5 regularization (movie, user) #
 
-#denoting lambda as a variable
+#denoting lambda as a tuning parameter
 lambdas <- seq(0, 10, 0.25)
 
 #calculate rmses which correspond to the value of lambdas  
@@ -309,7 +310,7 @@ rmse_results %>% knitr::kable()
 ###############################################################################
 #6 regularization  (movie, user,genres, release_year)#
 
-#denoting lambda as a variable
+#denoting lambda as a tuning parameter
 lambdas <- seq(0, 10, 0.25)
 
 #calculate rmses which correspond to the value of lambdas
@@ -372,11 +373,10 @@ rmse_results %>% knitr::kable()
 ################################################################################
 #Final Evaluation#
 
-#add a column  to the validation set
-#it is produced in the process of finding models
+#add a column  to the validation set. it is corresponding to the train_set
 validation <- validation %>% mutate(release_year = as.numeric(str_sub(title,-5,-2)))
 
-# define lambdas as a variable
+# define lambdas as a tuning parameter
 lambdas <- seq(0, 10, 0.25)
 
 #calculate rmse using "Reg Movie User Genre Release Year Effects Model" 
