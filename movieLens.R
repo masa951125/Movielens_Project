@@ -53,7 +53,7 @@ dim(validation)
 head(edx)
 
 ################################################################################
-#Rating#
+#1 Rating#
 
 #find out its range
 unique(edx$rating)%>% sort() 
@@ -65,7 +65,7 @@ edx %>%
   ggtitle("Ratings")
 
 ################################################################################
-#Users#
+#2 Users#
 
 #find unique number of users
 n_distinct(edx$userId)
@@ -79,7 +79,7 @@ edx %>%
   ggtitle("Users")
 
 ################################################################################
-#Movies#
+#3 Movies#
 
 #find unique number of movies
 n_distinct(edx$movieId)
@@ -93,7 +93,7 @@ edx %>%
   ggtitle("Movies")
 
 ################################################################################
-#Timestamp#
+#4 Timestamp#
 
 #covert "timestamp" to POSIXct data
 edx$timestamp <- as.POSIXct(edx$timestamp, origin= "1970-01-01", tz="GMT")
@@ -109,7 +109,7 @@ edx%>%
   ggtitle("Months of rating")
 
 ################################################################################    
-#Title#
+#5 Title#
 
 #extract the release years from the title, and its column is added to the edx
 #It is named "release year"
@@ -123,7 +123,7 @@ edx %>% group_by(release_year) %>%
   ggtitle("Release_year")
 
 ################################################################################
-#Genres
+#6 Genres#
 
 #find the number of unique genres
 edx$genres %>% n_distinct()
@@ -144,7 +144,7 @@ edx %>% group_by(genres) %>%
   ggtitle("Genres (n>20000)")
 
 ################################################################################
-#Exploration Summary#
+#7 Exploration Summary#
 
 #making test and training data 10% train_set, 90% test_set
 # set.seed(1) # if using R 3.5 or earlier
